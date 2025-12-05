@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "org.sber"
-version = "0.4.1"
+version = "0.5.0"
 
 repositories {
     mavenCentral()
@@ -25,6 +25,11 @@ intellij {
 
 dependencies {
     implementation(kotlin("stdlib"))
+    
+    // LangChain4j for AI integration
+    implementation("dev.langchain4j:langchain4j:0.35.0")
+    implementation("dev.langchain4j:langchain4j-open-ai:0.35.0")
+    
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.assertj:assertj-core:3.24.2")
 }
