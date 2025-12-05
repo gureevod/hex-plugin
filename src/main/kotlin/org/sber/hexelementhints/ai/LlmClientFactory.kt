@@ -1,22 +1,19 @@
 package org.sber.hexelementhints.ai
 
-import dev.langchain4j.model.chat.ChatLanguageModel
-import dev.langchain4j.model.openai.OpenAiChatModel
+import chat.giga.client.auth.AuthClient
+import chat.giga.http.client.JdkHttpClientBuilder
+import chat.giga.http.client.SSL
+import chat.giga.langchain4j.GigaChatChatModel
+import chat.giga.langchain4j.GigaChatChatRequestParameters
 import org.sber.hexelementhints.ai.settings.HexAiSettings
-import java.io.FileInputStream
-import java.security.KeyStore
-import java.security.SecureRandom
-import java.time.Duration
-import javax.net.ssl.KeyManagerFactory
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManagerFactory
+import java.net.http.HttpClient
 
 /**
  * Фабрика для создания LLM клиентов с поддержкой SSL/TLS и клиентского сертификата.
  */
 class LlmClientFactory {
 
-    private var cachedClient: ChatLanguageModel? = null
+    private var cachedClient: GigaChatChatModel? = null
     private var lastSettings: String? = null
     private var lastPassword: String? = null
 
@@ -24,7 +21,7 @@ class LlmClientFactory {
      * Создаёт или возвращает закэшированный LLM клиент.
      * При изменении настроек создаётся новый клиент.
      */
-    fun getOrCreateClient(settings: HexAiSettings.State, password: String): ChatLanguageModel {
+    fun getOrCreateClient(settings: HexAiSettings.State, password: String): GigaChatChatModel {
         val settingsKey = "${settings.certPath}|${settings.apiEndpoint}|${settings.modelName}"
         
         if (cachedClient != null && lastSettings == settingsKey && lastPassword == password) {
@@ -41,58 +38,31 @@ class LlmClientFactory {
     /**
      * Создаёт новый LLM клиент с настроенным SSL контекстом.
      */
-    fun createClient(settings: HexAiSettings.State, password: String): ChatLanguageModel {
-        val builder = OpenAiChatModel.builder()
-            .baseUrl(settings.apiEndpoint)
-            .modelName(settings.modelName)
-            .timeout(Duration.ofSeconds(120))
-            .maxRetries(2)
+    fun createClient(settings: HexAiSettings.State, password: String): GigaChatChatModel {
+        val builder = GigaChatChatModel.builder()
+            .defaultChatRequestParameters(GigaChatChatRequestParameters.builder()
+                .modelName(settings.modelName)
+                .build())
+            .authClient(
+                AuthClient.builder()
+                .withCertificatesAuth(JdkHttpClientBuilder()
+                    .httpClientBuilder(HttpClient.newBuilder())
+                    .ssl(
+                        SSL.builder()
+                        .truststorePassword(password)
+                        .trustStoreType("PKCS12")
+                        .truststorePath(settings.certPath)
+                        .keystorePassword(password)
+                        .keystoreType("PKCS12")
+                        .keystorePath(settings.certPath)
+                        .build())
+                    .build())
+                .build())
+            .apiUrl(settings.apiEndpoint)
             .logRequests(true)
             .logResponses(true)
 
-        // Если указан сертификат, настраиваем SSL
-        if (settings.certPath.isNotBlank()) {
-            val sslContext = createSslContext(settings.certPath, password)
-            // OpenAI клиент в LangChain4j использует внутренний HTTP клиент
-            // Для кастомного SSL требуется настройка через системные свойства или custom HTTP client
-            // В текущей реализации LangChain4j это делается через proxy или системные настройки
-            
-            // Устанавливаем системные свойства для SSL
-            System.setProperty("javax.net.ssl.keyStore", settings.certPath)
-            System.setProperty("javax.net.ssl.keyStorePassword", password)
-            System.setProperty("javax.net.ssl.keyStoreType", "PKCS12")
-        }
-
-        // Для OpenAI-совместимого API без API ключа используем заглушку
-        builder.apiKey("not-required-with-cert")
-
         return builder.build()
-    }
-
-    /**
-     * Создаёт SSL контекст с клиентским сертификатом PKCS12.
-     */
-    private fun createSslContext(certPath: String, password: String): SSLContext {
-        val keyStore = KeyStore.getInstance("PKCS12")
-        FileInputStream(certPath).use { fis ->
-            keyStore.load(fis, password.toCharArray())
-        }
-
-        val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        kmf.init(keyStore, password.toCharArray())
-
-        val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        // Используем тот же keystore для trust manager или системный
-        try {
-            tmf.init(keyStore)
-        } catch (e: Exception) {
-            // Если в keystore нет доверенных сертификатов, используем системные
-            tmf.init(null as KeyStore?)
-        }
-
-        return SSLContext.getInstance("TLS").apply {
-            init(kmf.keyManagers, tmf.trustManagers, SecureRandom())
-        }
     }
 
     /**
@@ -102,9 +72,9 @@ class LlmClientFactory {
     fun testConnection(settings: HexAiSettings.State, password: String): ConnectionTestResult {
         return try {
             val client = createClient(settings, password)
-            val response = client.generate("Say 'OK' if you can read this.")
+            val response = client.chat("Скажи 'ОК' если можешь это прочитать.")
             
-            if (response.contains("OK", ignoreCase = true)) {
+            if (response.contains("ОК", ignoreCase = true)) {
                 ConnectionTestResult.Success("Подключение успешно! Модель: ${settings.modelName}")
             } else {
                 ConnectionTestResult.Success("Подключение установлено. Ответ: ${response.take(50)}")

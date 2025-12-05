@@ -56,9 +56,9 @@ class HexAiService(private val project: Project) {
                     val systemMessage = SystemMessage.from(PromptBuilder.getSystemPrompt())
                     val userMessage = UserMessage.from(PromptBuilder.buildPageObjectPrompt(html, additionalInstructions))
                     
-                    val response = client.generate(listOf(systemMessage, userMessage))
+                    val response = client.chat(listOf(systemMessage, userMessage))
                     
-                    val code = CodeExtractor.extractCode(response.content().text())
+                    val code = CodeExtractor.extractCode(response.aiMessage().text())
                     val formattedCode = CodeExtractor.formatForDisplay(code)
 
                     indicator.text = "Готово!"
