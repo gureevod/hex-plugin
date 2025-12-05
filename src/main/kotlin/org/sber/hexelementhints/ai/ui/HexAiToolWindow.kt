@@ -1,11 +1,13 @@
 package org.sber.hexelementhints.ai.ui
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import org.sber.hexelementhints.ai.settings.HexAiSettings
 import java.awt.BorderLayout
 import java.awt.CardLayout
+import java.awt.Dimension
 import java.awt.FlowLayout
 import javax.swing.*
 
@@ -27,12 +29,19 @@ class HexAiToolWindow(private val project: Project) : JPanel(BorderLayout()) {
     private val statusLabel = JBLabel()
 
     companion object {
+        private val LOG = Logger.getInstance(HexAiToolWindow::class.java)
         private const val CARD_NOT_CONFIGURED = "notConfigured"
         private const val CARD_SETUP = "setup"
         private const val CARD_GENERATOR = "generator"
     }
 
     init {
+        LOG.info("HexAiToolWindow: Initializing...")
+        
+        // Устанавливаем минимальный размер
+        minimumSize = Dimension(300, 400)
+        preferredSize = Dimension(400, 600)
+        
         // Создаём панели
         setupPanel = SetupPanel(project) { onSettingsSaved() }
         generatorPanel = GeneratorPanel(project)
@@ -51,6 +60,8 @@ class HexAiToolWindow(private val project: Project) : JPanel(BorderLayout()) {
 
         // Показываем нужную карточку
         updateView()
+        
+        LOG.info("HexAiToolWindow: Initialization complete")
     }
 
     private fun createHeaderPanel(): JPanel {

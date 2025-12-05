@@ -7,7 +7,6 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import dev.langchain4j.data.message.AiMessage
 import dev.langchain4j.data.message.SystemMessage
 import dev.langchain4j.data.message.UserMessage
 import org.sber.hexelementhints.ai.settings.HexAiSettings
@@ -53,10 +52,16 @@ class HexAiService(private val project: Project) {
                     
                     val client = clientFactory.getOrCreateClient(settings.state, password)
                     
-                    val systemMessage = SystemMessage.from(PromptBuilder.getSystemPrompt())
-                    val userMessage = UserMessage.from(PromptBuilder.buildPageObjectPrompt(html, additionalInstructions))
+                    val systemPrompt = PromptBuilder.getSystemPrompt()
+                    val userPrompt = PromptBuilder.buildPageObjectPrompt(html, additionalInstructions)
                     
-                    val response = client.chat(listOf(systemMessage, userMessage))
+                    // GigaChatChatModel использует LangChain4j ChatLanguageModel интерфейс
+                    val messages = listOf(
+                        SystemMessage.from(systemPrompt),
+                        UserMessage.from(userPrompt)
+                    )
+                    
+                    val response = client.chat(messages)
                     
                     val code = CodeExtractor.extractCode(response.aiMessage().text())
                     val formattedCode = CodeExtractor.formatForDisplay(code)
